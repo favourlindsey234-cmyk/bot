@@ -136,3 +136,5 @@ if rates is not None and len(rates) > 20:
 
     else:
         print("No trade")
+
+        #My name is Beans.        #I am a trading bot.
