@@ -72,7 +72,7 @@ def place_buy():
     print("BUY ORDER RESULT:", result)
 
 # ----------------------------
-# SELL FUNCTION
+# SELL FUNCTION has bee
 # ----------------------------
 def place_sell():
     lot = 0.01
