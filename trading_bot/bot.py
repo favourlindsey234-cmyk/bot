@@ -1,3 +1,5 @@
+from unittest import result
+
 import MetaTrader5 as mt5
 import time
 
@@ -65,11 +67,12 @@ def place_buy():
         "magic": 123456,
         "comment": "Bot Buy",
         "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC,
+       
     }
 
     result = mt5.order_send(request)
     print("BUY ORDER RESULT:", result)
+    return result
 
 # ----------------------------
 # SELL FUNCTION has bee
@@ -100,11 +103,12 @@ def place_sell():
         "magic": 123456,
         "comment": "Bot Sell",
         "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC,
+        
     }
 
     result = mt5.order_send(request)
     print("SELL ORDER RESULT:", result)
+    return result
 
 # ----------------------------
 # MAIN LOOP (AUTO TRADING)
@@ -112,29 +116,34 @@ def place_sell():
 print("Bot running... 🚀")
 
 while True:
-    rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M5, 0, 50)
+    rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M5, 0, 100)
 
-if rates is not None and len(rates) > 20:
-    closes = [rate['close'] for rate in rates]
+    print("Rates length:", 0 if rates is None else len(rates))
 
-    # Moving averages
-    fast_ma = sum(closes[-10:]) / 10
-    slow_ma = sum(closes[-20:]) / 20
+    if rates is not None and len(rates) > 20:
+        closes = [rate['close'] for rate in rates]
 
-    print("Fast MA:", fast_ma, "| Slow MA:", slow_ma)
+        # Moving averages
+        fast_ma = sum(closes[-10:]) / 10
+        slow_ma = sum(closes[-20:]) / 20
 
-    # STRATEGY
-    if fast_ma > slow_ma and not has_open_trade():
-        print("BUY signal (trend up)")
-        place_buy()
-        time.sleep(10)
+        print("Fast MA:", fast_ma, "| Slow MA:", slow_ma)
 
-    elif fast_ma < slow_ma and not has_open_trade():
-        print("SELL signal (trend down)")
-        place_sell()
-        time.sleep(10)
+        # STRATEGY
+        if fast_ma > slow_ma and not has_open_trade():
+            print("BUY signal (trend up)")
+            place_buy()
+            time.sleep(10)
+
+        elif fast_ma < slow_ma and not has_open_trade():
+            print("SELL signal (trend down)")
+            place_sell()
+            time.sleep(10)
+
+        else:
+            print("No trade")
 
     else:
-        print("No trade")
+        print("No data yet...")
 
-        #My name is Beans.        #I am a trading bot.
+    time.sleep(5)
