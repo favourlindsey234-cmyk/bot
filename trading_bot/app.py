@@ -1,165 +1,128 @@
 import streamlit as st
+from bot import TradingBot
 import threading
+import MetaTrader5 as mt5
 import pandas as pd
-import random
-import time
-import numpy as np
-from bot import run_bot
-from auth import login, signup, db
 
-# ----------------------------
-# PAGE CONFIG
-# ----------------------------
-st.set_page_config(page_title="Trading Bot Pro", layout="wide")
+# 🎨 PAGE
+st.set_page_config(page_title="Trading Bot", layout="wide")
 
-# ----------------------------
-# SESSION STATE
-# ----------------------------
-if "user" not in st.session_state:
-    st.session_state.user = None
+# 🎨 STYLE
+st.markdown("""
+    <style>
+    body {background-color: #0e1117; color: white;}
+    .stMetric {
+        background-color: #1c1f26;
+        padding: 15px;
+        border-radius: 10px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-if "bot_running" not in st.session_state:
-    st.session_state.bot_running = False
+st.title("📊 Trading Dashboard")
 
-if "profit" not in st.session_state:
-    st.session_state.profit = 0.0
-
-# ----------------------------
-# AUTH PAGE
-# ----------------------------
-def auth_page():
-    st.title("🔐 Login")
-
-    choice = st.selectbox("Login / Signup", ["Login", "Signup"])
-
-    email = st.text_input("Email")
+# 🔐 LOGIN
+with st.sidebar:
+    st.header("🔐 MT5 Login")
+    login = st.text_input("Login ID")
     password = st.text_input("Password", type="password")
+    server = st.text_input("Server")
 
-    if choice == "Signup":
-        if st.button("Create Account"):
-            user = signup(email, password)
-            if user:
-                st.success("Account created")
+# SESSION STATE
+if "bot" not in st.session_state:
+    st.session_state.bot = None
 
-    if choice == "Login":
-        if st.button("Login"):
-            user = login(email, password)
-            if user:
-                st.session_state.user = user
-                st.rerun()
+if "running" not in st.session_state:
+    st.session_state.running = False
 
-# ----------------------------
-# MAIN APP
-# ----------------------------
-def main_app():
-    st.title("🚀 Trading Bot Pro")
+# 🎮 BUTTONS
+col1, col2 = st.columns(2)
 
-    user_id = st.session_state.user["localId"]
+with col1:
+    if st.button("🚀 Start Bot"):
+        if login and password and server:
+            bot = TradingBot(login, password, server)
+            thread = threading.Thread(target=bot.run)
+            thread.start()
 
-    # PROFIT SIMULATION
-    if st.session_state.bot_running:
-        st.session_state.profit += random.uniform(-0.5, 2.5)
-
-    profit = round(st.session_state.profit, 2)
-
-    # ----------------------------
-    # METRICS
-    # ----------------------------
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Strategy", "MA Cross")
-
-    col2.metric("Status", "RUNNING" if st.session_state.bot_running else "STOPPED")
-
-    col3.metric("Profit", f"${profit}")
-
-    st.divider()
-
-    # ----------------------------
-    # BOT CONTROL
-    # ----------------------------
-    col4, col5 = st.columns(2)
-
-    with col4:
-        if st.button("Start Bot"):
-            if not st.session_state.bot_running:
-                st.session_state.bot_running = True
-                threading.Thread(target=run_bot, args=(user_id,)).start()
-
-    with col5:
-        if st.button("Stop Bot"):
-            st.session_state.bot_running = False
-
-    st.divider()
-
-    # ----------------------------
-    # STATS
-    # ----------------------------
-    st.subheader("📊 Stats")
-
-    try:
-        trades = db.child("users").child(user_id).child("trades").get().val()
-
-        if trades:
-            trade_list = list(trades.values())
-
-            total = len(trade_list)
-            wins = sum(1 for t in trade_list if t["result"] == "win")
-            losses = sum(1 for t in trade_list if t["result"] == "loss")
-
-            win_rate = (wins / total) * 100 if total > 0 else 0
-
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Total", total)
-            c2.metric("Wins", wins)
-            c3.metric("Losses", losses)
-            c4.metric("Win Rate", f"{win_rate:.1f}%")
-
+            st.session_state.bot = bot
+            st.session_state.running = True
+            st.success("Bot Started")
         else:
-            st.write("No trades yet")
+            st.error("Fill all fields")
 
-    except:
-        st.write("Error loading stats")
+with col2:
+    if st.button("🛑 Stop Bot"):
+        if st.session_state.bot:
+            st.session_state.bot.stop()
+            st.session_state.running = False
+            st.warning("Bot Stopped")
 
-    # ----------------------------
-    # CHART
-    # ----------------------------
-    st.subheader("📈 Profit Curve")
-    profit_curve = np.cumsum([random.uniform(-2, 5) for _ in range(30)])
-    st.line_chart(profit_curve)
+# STATUS
+st.markdown("---")
+status = "🟢 Running" if st.session_state.running else "🔴 Stopped"
+st.subheader(f"Status: {status}")
 
-    # ----------------------------
-    # LOGS
-    # ----------------------------
-    st.subheader("📜 Logs")
+# CONNECT MT5
+if mt5.initialize():
 
-    try:
-        logs = db.child("users").child(user_id).child("logs").get().val()
+    account = mt5.account_info()
 
-        if logs:
-            log_list = [x["message"] for x in logs.values()]
-            st.code("\n".join(log_list[-20:]))
-        else:
-            st.write("No logs yet")
+    if account:
+        st.markdown("### 📊 Account Overview")
 
-    except:
-        st.write("Error loading logs")
+        col1, col2, col3 = st.columns(3)
 
-    # ----------------------------
-    # LOGOUT
-    # ----------------------------
-    if st.button("Logout"):
-        st.session_state.user = None
-        st.rerun()
+        col1.metric("💰 Balance", f"${account.balance}")
+        col2.metric("📈 Equity", f"${account.equity}")
+        col3.metric("📉 Profit", f"${account.profit}")
 
-    # AUTO REFRESH
-    time.sleep(2)
-    st.rerun()
+    # 📉 OPEN TRADES
+    st.markdown("### 📉 Open Trades")
+    positions = mt5.positions_get()
 
-# ----------------------------
-# ROUTING
-# ----------------------------
-if st.session_state.user is None:
-    auth_page()
+    if positions:
+        data = []
+        for pos in positions:
+            data.append({
+                "Symbol": pos.symbol,
+                "Lot": pos.volume,
+                "Profit": round(pos.profit, 2)
+            })
+        st.dataframe(pd.DataFrame(data))
+    else:
+        st.info("No open trades")
+
+    # 📜 TRADE HISTORY
+    st.markdown("### 📜 Trade History")
+
+    history = mt5.history_deals_get()
+
+    if history:
+        hist_data = []
+        for h in history[-10:]:
+            hist_data.append({
+                "Symbol": h.symbol,
+                "Profit": round(h.profit, 2),
+                "Type": h.type
+            })
+
+        df = pd.DataFrame(hist_data)
+        st.dataframe(df)
+
+        # 📊 STATS
+        wins = sum(1 for h in hist_data if h["Profit"] > 0)
+        losses = sum(1 for h in hist_data if h["Profit"] <= 0)
+        total = len(hist_data)
+
+        win_rate = (wins / total * 100) if total > 0 else 0
+
+        st.markdown("### 📊 Performance")
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Trades", total)
+        col2.metric("Wins", wins)
+        col3.metric("Win Rate", f"{win_rate:.1f}%")
+
 else:
-    main_app()
+    st.error("MT5 not connected")
