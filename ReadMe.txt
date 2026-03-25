@@ -85,3 +85,8 @@ Built using:
 - Python
 - Streamlit
 - MetaTrader5 API
+
+
+
+pip install -r requirements.txt
+python -m streamlit run app.py
