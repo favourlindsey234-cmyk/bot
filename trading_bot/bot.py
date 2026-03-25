@@ -10,7 +10,7 @@ class TradingBot:
 
         self.symbol = "EURUSD"
         self.lot = 0.03
-        self.max_trades = 1  # 🔥 sniper = fewer trades
+        self.max_trades = 1
 
         # Risk settings
         self.stop_loss_pips = 25
@@ -20,6 +20,7 @@ class TradingBot:
 
         self.running = False
 
+    # ✅ CONNECT
     def connect(self):
         if not mt5.initialize():
             print("❌ MT5 init failed")
@@ -32,7 +33,7 @@ class TradingBot:
         print("✅ Connected to MT5")
         return True
 
-    # 📊 MARKET DATA (H1 for trend)
+    # 📊 DATA (H1)
     def get_data(self):
         rates = mt5.copy_rates_from_pos(self.symbol, mt5.TIMEFRAME_H1, 0, 200)
         df = pd.DataFrame(rates)
@@ -50,7 +51,7 @@ class TradingBot:
         rs = gain / loss
         return 100 - (100 / (1 + rs))
 
-    # 🎯 SNIPER SIGNAL
+    # 🎯 SNIPER LOGIC
     def get_signal(self):
         df = self.get_data()
         df['rsi'] = self.calculate_rsi(df['close'])
@@ -60,7 +61,6 @@ class TradingBot:
         trend_up = last['ma20'] > last['ma50']
         trend_down = last['ma20'] < last['ma50']
 
-        # 🔥 SNIPER ENTRIES (pullbacks only)
         if trend_up and 40 < last['rsi'] < 55:
             print("🎯 SNIPER BUY SETUP")
             return "buy"
@@ -71,6 +71,7 @@ class TradingBot:
 
         return None
 
+    # 🎯 SL / TP
     def calculate_sl_tp(self, price, signal):
         point = mt5.symbol_info(self.symbol).point
 
@@ -83,10 +84,11 @@ class TradingBot:
 
         return sl, tp
 
+    # 🚀 PLACE TRADE (FIXED)
     def place_trade(self, signal):
         positions = mt5.positions_get(symbol=self.symbol)
         if positions:
-            print("⚠️ Trade already running (sniper mode)")
+            print("⚠️ Trade already running")
             return
 
         tick = mt5.symbol_info_tick(self.symbol)
@@ -109,17 +111,17 @@ class TradingBot:
             "magic": 123456,
             "comment": "Gravity Sniper",
             "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_FOK,  # ✅ FIXED
+            "type_filling": mt5.ORDER_FILLING_FOK,  # ✅ YOUR BROKER FIX
         }
 
         result = mt5.order_send(request)
 
         if result and result.retcode == mt5.TRADE_RETCODE_DONE:
-            print("🚀 SNIPER TRADE OPENED")
+            print("🚀 TRADE OPENED SUCCESSFULLY")
         else:
             print("❌ Trade failed:", result)
 
-    # 🛡️ SMART MANAGEMENT
+    # 🛡️ TRADE MANAGEMENT
     def manage_trades(self):
         positions = mt5.positions_get(symbol=self.symbol)
         if not positions:
@@ -130,7 +132,7 @@ class TradingBot:
             price = tick.bid if pos.type == 0 else tick.ask
             point = mt5.symbol_info(self.symbol).point
 
-            # ❌ Cut loss early
+            # ❌ CUT LOSS
             if pos.profit <= self.max_loss_per_trade:
                 print("❌ Cutting loss")
                 mt5.order_send({
@@ -144,7 +146,7 @@ class TradingBot:
                 })
                 continue
 
-            # ✅ Trailing stop
+            # ✅ TRAILING STOP
             if pos.type == 0:
                 new_sl = price - self.trailing_stop_pips * point * 10
                 if new_sl > pos.sl:
@@ -164,20 +166,29 @@ class TradingBot:
                         "tp": pos.tp
                     })
 
+    # 🔁 MAIN LOOP (WITH DEMO TRADE)
     def run(self):
         self.running = True
         print("🎯 Sniper Bot running...")
+
+        first_trade = True
 
         while self.running:
             signal = self.get_signal()
             print("Signal:", signal)
 
-            if signal:
+            # 🔥 FORCE TRADE FOR PRESENTATION
+            if first_trade:
+                print("🚀 DEMO TRADE (presentation)")
+                self.place_trade("buy")
+                first_trade = False
+
+            elif signal:
                 self.place_trade(signal)
 
             self.manage_trades()
 
-            time.sleep(15)
+            time.sleep(10)
 
     def stop(self):
         self.running = False

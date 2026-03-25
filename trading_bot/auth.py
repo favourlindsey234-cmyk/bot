@@ -14,7 +14,7 @@ firebaseConfig = {
 }
 
 firebase = pyrebase.initialize_app(firebaseConfig)
-S
+
 auth = firebase.auth()
 db = firebase.database()  # 🔥 NEW
 

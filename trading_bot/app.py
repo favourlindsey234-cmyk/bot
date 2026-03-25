@@ -2,84 +2,104 @@ import streamlit as st
 import threading
 from bot import TradingBot
 
+# 🔥 PAGE CONFIG
 st.set_page_config(
     page_title="Gravity Bot",
-    page_icon="🌌",
+    page_icon="🚀",
     layout="wide"
 )
 
-# 🎨 STYLE
+# 🎨 CLEAN UI STYLE
 st.markdown("""
 <style>
-.main {
-    background-color: #0e1117;
+.stApp {
+    background: linear-gradient(135deg, #0e1117, #1c1f26);
     color: white;
 }
-.stButton>button {
-    width: 100%;
-    border-radius: 10px;
-    height: 3em;
-    font-weight: bold;
+h1 {
+    color: #00ffcc;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# 🌌 HEADER
-st.title("🌌 Gravity Bot")
-st.markdown("### Precision Trading • Intelligent Execution")
+# 🚀 HEADER
+st.title("🚀 Gravity Bot")
+st.subheader("Live MT5 Trading System")
 
+# 🔐 SIDEBAR LOGIN
+st.sidebar.header("🔐 MT5 Login")
+
+login = st.sidebar.text_input("Login ID")
+password = st.sidebar.text_input("Password", type="password")
+server = st.sidebar.text_input("Server", value="MetaQuotes-Demo")
+
+# ⚙️ SETTINGS
+st.sidebar.header("⚙️ Settings")
+symbol = st.sidebar.text_input("Symbol", value="EURUSD")
+
+# 🧠 SESSION STATE
 if "bot" not in st.session_state:
     st.session_state.bot = None
+    st.session_state.thread = None
+    st.session_state.connected = False
     st.session_state.running = False
 
-col1, col2 = st.columns(2)
+# 🔌 CONNECT BUTTON
+if st.sidebar.button("🔌 Connect to MT5"):
+    bot = TradingBot(login, password, server)
+    bot.symbol = symbol
 
-# 🔐 CONNECTION
-with col1:
-    st.subheader("🔐 MT5 Connection")
+    if bot.connect():
+        st.session_state.bot = bot
+        st.session_state.connected = True
+        st.success("✅ Connected to MT5")
+    else:
+        st.error("❌ Connection failed")
 
-    login = st.text_input("Login ID")
-    password = st.text_input("Password", type="password")
-    server = st.text_input("Server", value="MetaQuotes-Demo")
+# 📊 STATUS DISPLAY
+col1, col2, col3 = st.columns(3)
 
-    if st.button("🔌 Connect"):
-        bot = TradingBot(login, password, server)
-        if bot.connect():
-            st.session_state.bot = bot
-            st.success("Connected to MT5")
-        else:
-            st.error("Connection failed")
+connection_status = "🟢 Connected" if st.session_state.connected else "🔴 Disconnected"
+bot_status = "🟢 Running" if st.session_state.running else "🔴 Stopped"
 
-# 🤖 CONTROL
-with col2:
-    st.subheader("🤖 Bot Control")
+col1.metric("Connection", connection_status)
+col2.metric("Bot Status", bot_status)
+col3.metric("Mode", "Live Trade")
 
-    if st.button("🚀 Start Bot"):
-        if st.session_state.bot:
-            thread = threading.Thread(target=st.session_state.bot.run)
+# ▶️ START BOT
+if st.button("▶️ Start Bot"):
+    if not st.session_state.connected:
+        st.warning("⚠️ Connect to MT5 first")
+    else:
+        if not st.session_state.running:
+            st.session_state.bot.running = True
+
+            thread = threading.Thread(
+                target=st.session_state.bot.run,
+                daemon=True  # 🔥 prevents UI freeze
+            )
             thread.start()
+
+            st.session_state.thread = thread
             st.session_state.running = True
-            st.success("Bot running")
-        else:
-            st.error("Connect first")
 
-    if st.button("🛑 Stop Bot"):
-        if st.session_state.bot:
-            st.session_state.bot.stop()
-            st.session_state.running = False
-            st.warning("Bot stopped")
+            st.success("🚀 Bot Started & Trade Sent")
 
-# 📊 STATUS
+# ⛔ STOP BOT
+if st.button("⛔ Stop Bot"):
+    if st.session_state.bot:
+        st.session_state.bot.stop()
+        st.session_state.running = False
+        st.success("🛑 Bot Stopped")
+
+# 📊 INFO PANEL
+st.markdown("### 📊 Live Status")
+
+if st.session_state.running:
+    st.success("Bot is running and executing trades...")
+else:
+    st.info("Connect to MT5 and start the bot to begin trading.")
+
+# FOOTER
 st.markdown("---")
-st.subheader("📊 System Status")
-
-col3, col4, col5 = st.columns(3)
-
-with col3:
-    st.metric("Bot Status", "Running" if st.session_state.running else "Stopped")
-
-with col4:
-    st.metric("Symbol", "EURUSD")
-
-with col5:
-    st.metric("System", "Gravity Engine v5")
+st.caption("Gravity Bot | Live MT5 Execution")
